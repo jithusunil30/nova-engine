@@ -248,7 +248,7 @@ def call_gemini_api(api_key: str, model: str, system_prompt: str, user_prompt: s
     clean_key = api_key.strip()
     # Preferred model first, with fallbacks for retired or unavailable models
     models_to_try = [model]
-    for fallback in ["gemini-flash-lite-latest", "gemini-3.6-flash", "gemini-flash-latest"]:
+    for fallback in ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-flash-lite-latest"]:
         if fallback not in models_to_try:
             models_to_try.append(fallback)
 
@@ -394,8 +394,8 @@ class PolyglotRuntime:
         provider = (prefs.get("aiProvider") or "auto").lower()
         gemini_key = (prefs.get("geminiApiKey") or os.environ.get("GEMINI_API_KEY") or "").strip()
         groq_key = (prefs.get("groqApiKey") or os.environ.get("GROQ_API_KEY") or "").strip()
-        gemini_model = prefs.get("geminiModel") or "gemini-flash-lite-latest"
-        groq_model = prefs.get("groqModel") or "llama-3.3-70b-versatile"
+        gemini_model = prefs.get("geminiModel") or "gemini-3.5-flash-lite"
+        groq_model = prefs.get("groqModel") or "openai/gpt-oss-120b"
 
         # Explicit validation: Fall back gracefully with clear error message if no API key is configured
         if provider == "gemini" and not gemini_key:

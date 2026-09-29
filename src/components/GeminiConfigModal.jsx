@@ -6,9 +6,9 @@ import {
 export default function GeminiConfigModal({ isOpen, onClose, onConfigSaved }) {
   const [activeProvider, setActiveProvider] = useState('auto'); // 'auto', 'gemini', 'groq', 'native'
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
-  const [geminiModel, setGeminiModel] = useState('gemini-3.6-flash');
+  const [geminiModel, setGeminiModel] = useState('gemini-3.5-flash-lite');
   const [groqKeyInput, setGroqKeyInput] = useState('');
-  const [groqModel, setGroqModel] = useState('llama-3.3-70b-versatile');
+  const [groqModel, setGroqModel] = useState('openai/gpt-oss-120b');
   const [showKey, setShowKey] = useState(false);
   const [aiStatus, setAiStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(false);

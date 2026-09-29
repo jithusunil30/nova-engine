@@ -2,10 +2,10 @@ import fs from 'fs';
 import path from 'path';
 
 export const GEMINI_MODELS = [
-  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash (Recommended - Ultra Fast)', isDefault: true },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Balanced Intelligence)' },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite (Recommended - High Quota & Ultra Fast)', isDefault: true },
+  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash (Latest Generation)' },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
   { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (Deep Reasoning)' }
 ];
 
@@ -204,49 +204,52 @@ export function maskApiKey(key) {
   return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
-export async function testGeminiApiKey(apiKey, model = 'gemini-3.6-flash') {
+export async function testGeminiApiKey(apiKey, model = 'gemini-3.5-flash-lite') {
   if (!apiKey || apiKey.trim().length < 5) {
     return { success: false, error: 'API key is required or too short.' };
   }
   
   const startTime = Date.now();
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+  const modelsToTry = [model, 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  const uniqueModels = [...new Set(modelsToTry)];
   
-  const payload = {
-    contents: [
-      { parts: [{ text: 'N.O.V.A. system ping. Respond with OK.' }] }
-    ]
-  };
-
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-    const durationMs = Date.now() - startTime;
-
-    if (!res.ok) {
-      const errMsg = data?.error?.message || `HTTP ${res.status} error from Gemini API`;
-      return { success: false, error: errMsg, durationMs };
-    }
-
-    const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'OK';
-    return {
-      success: true,
-      model,
-      maskedKey: maskApiKey(apiKey),
-      latencyMs: durationMs,
-      sampleResponse: replyText.trim()
+  for (const m of uniqueModels) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey.trim()}`;
+    const payload = {
+      contents: [
+        { parts: [{ text: 'N.O.V.A. system ping. Respond with OK.' }] }
+      ]
     };
-  } catch (err) {
-    return { success: false, error: err.message || 'Network connection error' };
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      const durationMs = Date.now() - startTime;
+
+      if (res.ok) {
+        const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'OK';
+        return {
+          success: true,
+          model: m,
+          maskedKey: maskApiKey(apiKey),
+          latencyMs: durationMs,
+          sampleResponse: replyText.trim()
+        };
+      }
+    } catch (err) {
+      // Continue loop
+    }
   }
+
+  return { success: false, error: 'All Gemini model endpoints failed or exceeded quota.' };
 }
 
-export async function runGeminiAgentTurn({ prompt, apiKey, model = 'gemini-3.6-flash', memoryData = {}, toolExecutors = {} }) {
+export async function runGeminiAgentTurn({ prompt, apiKey, model = 'gemini-3.5-flash-lite', memoryData = {}, toolExecutors = {} }) {
   const steps = [];
   const userName = memoryData.preferences?.userName || 'Jithu';
   const memoriesList = (memoryData.memories || []).map(m => `- [${m.category}] ${m.fact}`).join('\n');
@@ -268,9 +271,13 @@ Instructions:
 2. When the user asks to run commands, execute scripts, create files, check systems, search online, or query Cassandra, call the appropriate tool.
 3. Be proactive, efficient, clear, and helpful. Format your responses using clean, attractive Markdown. Address the user as ${userName}.`;
 
+  const fallbackModels = [model, 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  const uniqueFallbackModels = [...new Set(fallbackModels)];
+  let activeModel = uniqueFallbackModels[0];
+
   steps.push({
     phase: 'THOUGHT',
-    message: `Gemini ${model} Engine Initialized. Context loaded: ${userName}, ${(memoryData.memories || []).length} long-term memories. Processing prompt: "${prompt}"`
+    message: `Gemini ${activeModel} Engine Initialized. Context loaded: ${userName}, ${(memoryData.memories || []).length} long-term memories. Processing prompt: "${prompt}"`
   });
 
   const contents = [
@@ -286,35 +293,46 @@ Instructions:
   while (iterations < maxIterations) {
     iterations++;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const reqBody = {
-      system_instruction: {
-        parts: [{ text: systemInstructionText }]
-      },
-      contents,
-      tools: TOOL_DECLARATIONS
-    };
-
     let resData;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody)
-      });
+    let requestSucceeded = false;
 
-      resData = await res.json();
-      if (!res.ok) {
-        const errMsg = resData?.error?.message || `Gemini API HTTP Error ${res.status}`;
-        steps.push({ phase: 'OBSERVATION', output: `Gemini API Error: ${errMsg}` });
-        throw new Error(errMsg);
+    for (const curModel of uniqueFallbackModels) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${curModel}:generateContent?key=${apiKey}`;
+      const reqBody = {
+        system_instruction: {
+          parts: [{ text: systemInstructionText }]
+        },
+        contents,
+        tools: TOOL_DECLARATIONS
+      };
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reqBody)
+        });
+
+        resData = await res.json();
+        if (res.ok) {
+          activeModel = curModel;
+          requestSucceeded = true;
+          break;
+        } else {
+          const errMsg = resData?.error?.message || `HTTP ${res.status}`;
+          steps.push({ phase: 'OBSERVATION', output: `Gemini ${curModel} notice: ${errMsg}. Trying alternate model.` });
+        }
+      } catch (err) {
+        steps.push({ phase: 'OBSERVATION', output: `Gemini ${curModel} error: ${err.message}.` });
       }
-    } catch (err) {
+    }
+
+    if (!requestSucceeded) {
       return {
         steps,
-        responseText: `⚠️ **Gemini API Error**: ${err.message}\n\nPlease check your Gemini API key or network connection.`,
+        responseText: `⚠️ **Gemini API Error**: All available Gemini models were unavailable or rate-limited.`,
         isGemini: true,
-        error: err.message
+        error: 'Gemini all models failed'
       };
     }
 
