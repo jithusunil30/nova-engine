@@ -23,6 +23,18 @@ import {
   GROQ_MODELS 
 } from './aiService.js';
 import { launchApp, cleanAppName } from './appLauncher.js';
+import {
+  adjustVolume,
+  getBrightness,
+  setBrightness,
+  getHardwareStatus,
+  organizeFolder,
+  findRecentNotes,
+  captureAndAnalyzeScreen,
+  scheduleReminder,
+  getActiveReminders,
+  registerBroadcastCallback
+} from './systemController.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +47,23 @@ app.use(express.json());
 
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
+
+// Register proactive alert broadcast over WebSocket
+registerBroadcastCallback((payload) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(payload));
+    }
+  });
+});
+
+// Working Conversational Memory Context (Coreference Resolution)
+let workingContext = {
+  lastFolder: null,
+  lastAction: null,
+  lastFile: null,
+  lastApp: null
+};
 
 // In-Memory & File Persistence
 const MEMORY_FILE = path.join(__dirname, 'nova_memory.json');
@@ -1047,6 +1076,174 @@ async function executeAutonomousAntigravityTask(prompt, userName, lowerPrompt) {
     }
   }
 
+  // 0.A CONVERSATIONAL COREFERENCE RESOLUTION ("now do the same for the other folder" / "now do the same for desktop")
+  if (lowerPrompt.includes('do the same') || lowerPrompt.includes('same for')) {
+    if (workingContext.lastAction === 'organize') {
+      const targetMatch = lowerPrompt.match(/(?:for|to)\s+(?:the\s+)?([a-zA-Z0-9_\-\.\/\\]+)/i);
+      const target = targetMatch ? targetMatch[1].trim() : (workingContext.lastFolder === 'downloads' ? 'desktop' : 'downloads');
+      
+      steps.push({
+        phase: 'THOUGHT',
+        message: `Resolving conversational coreference. Previous action was "organize" on ${workingContext.lastFolder}. Applying to target: "${target}".`
+      });
+      steps.push({
+        phase: 'ACTION',
+        tool: 'organize_folder',
+        input: { target }
+      });
+
+      const orgRes = await organizeFolder(target);
+      workingContext.lastFolder = target;
+
+      if (orgRes.success) {
+        steps.push({
+          phase: 'OBSERVATION',
+          output: `Successfully organized ${orgRes.totalOrganized} files in ${orgRes.folder}.`
+        });
+        const summaryStr = Object.entries(orgRes.summary).map(([k, v]) => `• **${k}**: ${v} files`).join('\n');
+        responseText = `📁 **Folder Organized (Conversational Context Resolved)**\n\nCompleted the same cleanup on **${target}** as requested, **${userName}**!\n\n**Organized:** ${orgRes.totalOrganized} files moved\n${summaryStr || '*(No stray files found)*'}`;
+        return { steps, responseText, isAutonomousAction: true };
+      }
+    }
+  }
+
+  // 0.B INTELLIGENT FILE ORGANIZER ("clean up my downloads", "organize downloads", "clean downloads folder", "organize desktop")
+  if ((lowerPrompt.includes('clean') || lowerPrompt.includes('organize')) && (lowerPrompt.includes('download') || lowerPrompt.includes('desktop') || lowerPrompt.includes('folder'))) {
+    const target = lowerPrompt.includes('desktop') ? 'desktop' : 'downloads';
+    workingContext.lastAction = 'organize';
+    workingContext.lastFolder = target;
+
+    steps.push({
+      phase: 'THOUGHT',
+      message: `Analyzing directive: "${prompt}". User ${userName} requested file cleanup on ${target}. Categorizing stray files into Documents, Images, Archives, Installers, Code, and Media.`
+    });
+    steps.push({
+      phase: 'ACTION',
+      tool: 'organize_folder',
+      input: { target }
+    });
+
+    const orgRes = await organizeFolder(target);
+    if (orgRes.success) {
+      steps.push({
+        phase: 'OBSERVATION',
+        output: `Organized ${orgRes.totalOrganized} files in ${orgRes.folder}.`
+      });
+      const summaryStr = Object.entries(orgRes.summary).map(([k, v]) => `• **${k}**: ${v} files`).join('\n');
+      responseText = `🧹 **Intelligent File Cleanup Complete**\n\nN.O.V.A. has sorted and organized your **${target}** folder, **${userName}**!\n\n**Location:** \`${orgRes.folder}\`\n**Files Organized:** ${orgRes.totalOrganized}\n\n**Categories Sorted:**\n${summaryStr || '*(Folder is already clean and organized)*'}`;
+      return { steps, responseText, isAutonomousAction: true };
+    }
+  }
+
+  // 0.C RECENT NOTES & EXERCISE SEARCH ("open yesterday's notes", "find recent notes", "search notes")
+  if (lowerPrompt.includes('note') && (lowerPrompt.includes('yesterday') || lowerPrompt.includes('recent') || lowerPrompt.includes('find') || lowerPrompt.includes('open') || lowerPrompt.includes('search'))) {
+    const queryMatch = prompt.match(/(?:for|about|named)\s+([a-zA-Z0-9_\-\.]+)/i);
+    const query = queryMatch ? queryMatch[1].trim() : '';
+
+    steps.push({
+      phase: 'THOUGHT',
+      message: `Searching user workspace, Desktop, and Documents for recently modified notes and exercises.`
+    });
+    steps.push({
+      phase: 'ACTION',
+      tool: 'find_recent_notes',
+      input: { query, daysBack: 7 }
+    });
+
+    const notes = await findRecentNotes(query, 7);
+    steps.push({
+      phase: 'OBSERVATION',
+      output: `Located ${notes.length} recent note/document artifacts.`
+    });
+
+    if (notes.length > 0) {
+      const topNote = notes[0];
+      workingContext.lastFile = topNote.path;
+      const notesList = notes.map(n => `• **${n.name}** (\`${n.path}\`) — *${new Date(n.modified).toLocaleString()}*`).join('\n');
+      responseText = `📝 **Recent Notes Located**\n\nHere are the most recent notes and exercise documents found on your system, **${userName}**:\n\n${notesList}\n\n*(Latest: \`${topNote.name}\`)*`;
+      return { steps, responseText, isAutonomousAction: true };
+    }
+  }
+
+  // 0.D HARDWARE & SYSTEM SETTINGS CONTROL (Volume, Brightness, Wi-Fi, Battery)
+  if (lowerPrompt.includes('volume') || lowerPrompt.includes('sound') || lowerPrompt.includes('mute')) {
+    let dir = 'up';
+    if (lowerPrompt.includes('down') || lowerPrompt.includes('lower') || lowerPrompt.includes('decrease')) dir = 'down';
+    if (lowerPrompt.includes('mute')) dir = 'mute';
+    const num = lowerPrompt.match(/\b([0-9]{1,3})\b/);
+    if (num) dir = num[1];
+
+    steps.push({
+      phase: 'THOUGHT',
+      message: `Executing system audio adjustment: ${dir}.`
+    });
+    steps.push({
+      phase: 'ACTION',
+      tool: 'adjust_volume',
+      input: { level: dir }
+    });
+
+    const volRes = await adjustVolume(dir);
+    steps.push({ phase: 'OBSERVATION', output: volRes.message || 'Volume command dispatched.' });
+    responseText = `🔊 **Audio System Control**\n\nN.O.V.A. has adjusted your workstation audio level (**${dir}**), **${userName}**.`;
+    return { steps, responseText, isAutonomousAction: true };
+  }
+
+  if (lowerPrompt.includes('brightness')) {
+    const num = lowerPrompt.match(/\b([0-9]{1,3})\b/);
+    const targetBrightness = num ? parseInt(num[1], 10) : 70;
+
+    steps.push({ phase: 'THOUGHT', message: `Setting display brightness to ${targetBrightness}%.` });
+    steps.push({ phase: 'ACTION', tool: 'set_brightness', input: { level: targetBrightness } });
+
+    const brightRes = await setBrightness(targetBrightness);
+    steps.push({ phase: 'OBSERVATION', output: brightRes.message || `Brightness set to ${targetBrightness}%.` });
+    responseText = `☀️ **Display Brightness Adjusted**\n\nDisplay brightness has been calibrated to **${targetBrightness}%**, **${userName}**.`;
+    return { steps, responseText, isAutonomousAction: true };
+  }
+
+  if (lowerPrompt.includes('wifi') || lowerPrompt.includes('wi-fi') || lowerPrompt.includes('battery') || lowerPrompt.includes('hardware status')) {
+    steps.push({ phase: 'THOUGHT', message: `Querying native Windows hardware controllers for Wi-Fi and Battery telemetry.` });
+    steps.push({ phase: 'ACTION', tool: 'get_hardware_status', input: {} });
+
+    const hw = await getHardwareStatus();
+    steps.push({ phase: 'OBSERVATION', output: `Wi-Fi: ${hw.wifiRaw.replace(/\r?\n/g, ' ')} | Battery: ${hw.battery ? hw.battery.percent + '%' : 'Desktop/AC'}` });
+
+    const batStr = hw.battery ? `${hw.battery.percent}% (${hw.battery.isCharging ? 'Charging' : 'On Battery'})` : 'AC Desktop Connected';
+    responseText = `📶 **Workstation Hardware Diagnostics**\n\n**Wi-Fi Connection:**\n\`\`\`\n${hw.wifiRaw || 'Connected'}\n\`\`\`\n**Battery Status:** ${batStr}\n**System:** Windows 11 Workstation`;
+    return { steps, responseText, isAutonomousAction: true };
+  }
+
+  // 0.E MULTIMODAL PERCEPTION: SCREEN VISION ("what is on my screen", "analyze my screen", "inspect screen")
+  if (lowerPrompt.includes('screen') && (lowerPrompt.includes('what') || lowerPrompt.includes('see') || lowerPrompt.includes('analyze') || lowerPrompt.includes('look') || lowerPrompt.includes('inspect'))) {
+    steps.push({ phase: 'THOUGHT', message: `Capturing desktop display monitor and invoking Gemini Multimodal Vision perception.` });
+    steps.push({ phase: 'ACTION', tool: 'analyze_screen_vision', input: { question: prompt } });
+
+    const apiKey = resolveGeminiApiKey(novaMemory.preferences);
+    const visionRes = await captureAndAnalyzeScreen(prompt, apiKey);
+
+    steps.push({ phase: 'OBSERVATION', output: `Vision analysis complete. Screenshot saved to ${visionRes.screenshotUrl}` });
+    responseText = `👁️ **N.O.V.A. Vision Perception Analysis**\n\n${visionRes.analysis}\n\n*(Artifact: [View Screenshot](${visionRes.screenshotUrl}))*`;
+    return { steps, responseText, isAutonomousAction: true };
+  }
+
+  // 0.F PROACTIVE BACKGROUND REMINDER ("remind me in X minutes to ...")
+  if (lowerPrompt.startsWith('remind me') || lowerPrompt.includes('set a reminder')) {
+    const minMatch = prompt.match(/(?:in\s+)?([0-9]+)\s*(?:minute|min)/i);
+    const delayMinutes = minMatch ? parseInt(minMatch[1], 10) : 2;
+    const taskMatch = prompt.match(/(?:to|that)\s+(.+)/i);
+    const reminderText = taskMatch ? taskMatch[1].trim() : 'Scheduled N.O.V.A. reminder';
+
+    steps.push({ phase: 'THOUGHT', message: `Registering proactive background daemon timer for ${delayMinutes} minutes.` });
+    steps.push({ phase: 'ACTION', tool: 'schedule_reminder', input: { text: reminderText, minutes: delayMinutes } });
+
+    const rem = scheduleReminder(reminderText, delayMinutes);
+    steps.push({ phase: 'OBSERVATION', output: `Timer armed (ID: ${rem.id}) for ${rem.fireTime}` });
+
+    responseText = `⏰ **Proactive Reminder Scheduled**\n\nN.O.V.A. has armed a background alert for you, **${userName}**:\n\n**Reminder:** "${reminderText}"\n**Alert Time:** In ${delayMinutes} minute(s) (${new Date(rem.fireTime).toLocaleTimeString()})\n\n*(N.O.V.A. will notify you via HUD broadcast and speech audio)*`;
+    return { steps, responseText, isAutonomousAction: true };
+  }
+
   // 0. AUTONOMOUS APP LAUNCH TASK (e.g. "open spotify", "launch brave", "open notepad", "open app_name")
   const isAppLaunchIntent = 
     lowerPrompt.startsWith('open ') || 
@@ -1486,6 +1683,35 @@ $bmp.Dispose()
       novaMemory.memories.push(newMem);
       saveMemory();
       return `Saved memory into long-term store: "${fact}"`;
+    },
+    adjust_volume: async ({ level }) => {
+      const res = await adjustVolume(level);
+      return res.message || `Volume set to ${level}`;
+    },
+    set_brightness: async ({ level }) => {
+      const res = await setBrightness(level);
+      return res.message || `Brightness set to ${level}%`;
+    },
+    get_hardware_status: async () => {
+      const res = await getHardwareStatus();
+      return `Wi-Fi: ${res.wifiRaw}\nBattery: ${res.battery ? res.battery.percent + '%' : 'AC Power'}`;
+    },
+    organize_folder: async ({ target }) => {
+      const res = await organizeFolder(target);
+      return `Organized ${res.totalOrganized} files in ${res.folder}.`;
+    },
+    find_recent_notes: async ({ query, daysBack }) => {
+      const res = await findRecentNotes(query, daysBack || 7);
+      return `Found ${res.length} notes: ${res.map(n => n.name).join(', ')}`;
+    },
+    analyze_screen_vision: async ({ question }) => {
+      const apiKey = resolveGeminiApiKey(novaMemory.preferences);
+      const res = await captureAndAnalyzeScreen(question, apiKey);
+      return res.analysis || 'Vision analysis complete.';
+    },
+    schedule_reminder: async ({ text, minutes }) => {
+      const res = scheduleReminder(text, minutes);
+      return `Armed reminder "${text}" for ${res.fireTime}.`;
     }
   };
 

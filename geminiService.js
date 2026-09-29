@@ -109,6 +109,80 @@ export const TOOL_DECLARATIONS = [
           },
           required: ['fact']
         }
+      },
+      {
+        name: 'adjust_volume',
+        description: 'Adjusts workstation audio volume (up, down, mute, unmute, or percentage 0-100).',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            level: { type: 'STRING', description: 'Volume level or direction (e.g. "up", "down", "mute", "50")' }
+          },
+          required: ['level']
+        }
+      },
+      {
+        name: 'set_brightness',
+        description: 'Adjusts laptop/monitor display brightness percentage (0 to 100).',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            level: { type: 'NUMBER', description: 'Brightness level from 0 to 100' }
+          },
+          required: ['level']
+        }
+      },
+      {
+        name: 'get_hardware_status',
+        description: 'Retrieves real-time Wi-Fi connection, signal quality, and battery charging percentage.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {}
+        }
+      },
+      {
+        name: 'organize_folder',
+        description: 'Automatically cleans and organizes files in downloads or desktop into categorized folders (Documents, Images, Archives, Installers, Media, Code).',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            target: { type: 'STRING', description: 'Folder to organize: "downloads", "desktop", or custom path' }
+          },
+          required: ['target']
+        }
+      },
+      {
+        name: 'find_recent_notes',
+        description: 'Finds recently created or modified notes, documents, and scripts across Desktop and Documents.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            query: { type: 'STRING', description: 'Optional keyword or note topic' },
+            daysBack: { type: 'NUMBER', description: 'Number of past days to scan (default 7)' }
+          }
+        }
+      },
+      {
+        name: 'analyze_screen_vision',
+        description: 'Takes a screenshot and interprets what is on the screen using AI multimodal vision.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            question: { type: 'STRING', description: 'Specific question about what is on screen' }
+          }
+        }
+      },
+      {
+        name: 'schedule_reminder',
+        description: 'Sets a proactive background reminder that alerts the user after a specified number of minutes.',
+        parameters: {
+          type: 'OBJECT',
+          properties: {
+            text: { type: 'STRING', description: 'Reminder message to alert user' },
+            minutes: { type: 'NUMBER', description: 'Delay in minutes before alerting' }
+          },
+          required: ['text', 'minutes']
+        }
       }
     ]
   }

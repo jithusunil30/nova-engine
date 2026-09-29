@@ -20,9 +20,12 @@ nova_memory.json
 # Temporary and Generated Agent Scripts
 temp_*.py
 nova_script_*.js
+nova_python_*.py
 workspace_*.py
 test_nova.txt
 nova_context.db
+__pycache__/
+*.pyc
 
 # Editor and OS
 .vscode/*

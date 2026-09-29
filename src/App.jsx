@@ -94,6 +94,16 @@ export default function App() {
             cpu: { ...prev.cpu, load: msg.data.cpuLoad },
             memory: { ...prev.memory, percent: msg.data.memPercent }
           } : prev);
+        } else if (msg.type === 'PROACTIVE_ALERT') {
+          const alertMsg = `⏰ **[PROACTIVE REMINDER]**: ${msg.message}`;
+          setResponseText(alertMsg);
+          setIsPopUpOpen(true);
+          speakText(`Reminder for Jithu: ${msg.message}`);
+          setCurrentSteps([
+            { phase: 'THOUGHT', message: 'Proactive daemon timer triggered scheduled event.' },
+            { phase: 'OBSERVATION', output: msg.message },
+            { phase: 'CONCLUSION', output: 'Dispatched alert to HUD and voice engine.' }
+          ]);
         }
       } catch (e) {}
     };
