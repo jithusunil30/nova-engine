@@ -38,14 +38,28 @@ export default function VoiceController({
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
         osc.start();
         osc.stop(ctx.currentTime + 0.15);
-      } else if (type === 'activate') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.25);
+      } else if (type === 'activate' || type === 'siri_chime') {
+        // High harmonic double-chime (D5 -> A5, matching modern voice assistant activation)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc2.frequency.setValueAtTime(880.00, ctx.currentTime + 0.08); // A5
+
+        gainNode.gain.setValueAtTime(0.12, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+
+        osc1.connect(gainNode);
+        osc2.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        osc1.start(ctx.currentTime);
+        osc1.stop(ctx.currentTime + 0.12);
+        osc2.start(ctx.currentTime + 0.08);
+        osc2.stop(ctx.currentTime + 0.35);
       }
     } catch (e) {
       console.warn('AudioContext not allowed or not supported', e);
@@ -58,9 +72,16 @@ export default function VoiceController({
       if ('speechSynthesis' in window) {
         const voices = window.speechSynthesis.getVoices();
         setAvailableVoices(voices);
-        const jarvisVoice = voices.find(v => v.name.includes('UK English Male') || v.name.includes('Google UK English Male') || (v.lang.startsWith('en') && v.name.includes('Male')));
-        if (jarvisVoice) {
-          setSelectedVoice(jarvisVoice);
+        const preferredVoice = voices.find(v => 
+          v.name.includes('Natural') || 
+          v.name.includes('UK English Male') || 
+          v.name.includes('Google UK English Male') || 
+          v.name.includes('Daniel') || 
+          v.name.includes('Samantha') || 
+          (v.lang.startsWith('en') && v.name.includes('Male'))
+        );
+        if (preferredVoice) {
+          setSelectedVoice(preferredVoice);
         } else if (voices.length > 0) {
           setSelectedVoice(voices[0]);
         }
@@ -91,10 +112,14 @@ export default function VoiceController({
 
         const lastResult = event.results[event.results.length - 1];
         if (lastResult.isFinal) {
-          const text = currentTranscript.trim();
-          if (text) {
-            playHudSound('activate');
-            onVoiceCommand(text);
+          const rawText = currentTranscript.trim();
+          if (rawText) {
+            // Wake word recognition ("nova", "hey nova")
+            const lower = rawText.toLowerCase();
+            const cleanDirective = lower.replace(/^(?:hey\s+)?nova[,:\s]*/i, '').trim();
+
+            playHudSound('siri_chime');
+            onVoiceCommand(cleanDirective || rawText);
             setTranscript('');
           }
         }

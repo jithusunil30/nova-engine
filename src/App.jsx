@@ -13,6 +13,7 @@ import ApprovalModal from './components/ApprovalModal';
 import HudPopUpModal from './components/HudPopUpModal';
 import GeminiConfigModal from './components/GeminiConfigModal';
 import ClosedCaptionOverlay from './components/ClosedCaptionOverlay';
+import NovaWidget from './components/NovaWidget';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('hud'); // 'hud', 'agent', 'system', 'terminal', 'telemetry', 'files', 'memory'
@@ -37,16 +38,23 @@ export default function App() {
   const [charIndex, setCharIndex] = useState(0);
   const [charLength, setCharLength] = useState(0);
 
-  // Speech Output Helper with Real-Time Closed Captioning
+  // Speech Output Helper with Siri-Grade Punchy Natural Phrasing & Real-Time Closed Captioning
   const speakText = (text) => {
     if (!text) return;
-    const cleanText = text
-      .replace(/```[\s\S]*?```/g, 'Code block provided in transmission.')
-      .replace(/[*#`_~]/g, '')
-      .replace(/https?:\/\/\S+/g, 'web link')
-      .slice(0, 450);
 
-    setCaptionText(cleanText);
+    // 1. Strip markdown code fences, headers, URLs, and bold/italic markers
+    let clean = text
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/[#*`_~]/g, '')
+      .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}]/gu, '')
+      .trim();
+
+    // 2. Extract first 1-2 natural sentences for spoken brevity (just like Siri)
+    const sentences = clean.split(/(?<=[.!?])\s+/).filter(Boolean);
+    const spokenText = (sentences.slice(0, 2).join(' ') || clean).slice(0, 160);
+
+    setCaptionText(spokenText);
     setCharIndex(0);
     setCharLength(0);
 
@@ -54,9 +62,19 @@ export default function App() {
 
     try {
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const utterance = new SpeechSynthesisUtterance(spokenText);
       utterance.rate = 1.05;
       utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => 
+        v.name.includes('Natural') || 
+        v.name.includes('Google UK English Male') || 
+        v.name.includes('Samantha') || 
+        v.name.includes('Daniel') ||
+        (v.lang.startsWith('en') && !v.name.includes('David'))
+      );
+      if (preferred) utterance.voice = preferred;
 
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => setIsSpeaking(false);
@@ -462,6 +480,19 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Siri Ambient Screen Edge Aura (glows when speaking, listening, or executing) */}
+      {(isSpeaking || agentState === 'executing') && (
+        <div className="siri-ambient-aura" />
+      )}
+
+      {/* Floating Siri Orb Assistant Widget */}
+      <NovaWidget
+        onRunDirective={handleRunDirective}
+        sysInfo={sysInfo}
+        isSpeaking={isSpeaking}
+        agentState={agentState}
+      />
     </div>
   );
 }
