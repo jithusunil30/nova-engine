@@ -1,0 +1,255 @@
+@import "tailwindcss";
+@source "../index.html";
+@source "./**/*.{js,ts,jsx,tsx}";
+
+:root {
+  --color-hud-bg: #000000;
+  --color-hud-card: #080808;
+  --color-hud-border: rgba(255, 255, 255, 0.35);
+  --color-hud-border-glow: rgba(255, 255, 255, 0.85);
+  --color-white: #ffffff;
+  --color-dim-white: #a1a1aa;
+}
+
+body {
+  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  background-color: #000000;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+}
+
+/* ─── STARK HUD EXACT CENTERED FRAME (BLACK & FLUORESCENT WHITE) ─── */
+.hud-viewport {
+  width: 100vw;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000000;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.hud-stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1420px;
+  height: 900px;
+  max-height: 96vh;
+  margin: auto;
+  position: relative;
+  background: rgba(8, 8, 8, 0.96);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 0 50px rgba(255, 255, 255, 0.12), inset 0 0 40px rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.35);
+  padding-bottom: 12px;
+  width: 100%;
+  z-index: 10;
+}
+
+.hud-grid {
+  display: grid;
+  grid-template-columns: 290px 1fr 290px;
+  gap: 24px;
+  flex: 1;
+  align-items: stretch;
+  padding: 14px 0;
+  width: 100%;
+  z-index: 10;
+}
+
+.hud-col-left, .hud-col-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+}
+
+.hud-col-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0 16px;
+  width: 100%;
+  height: 100%;
+}
+
+.hud-box {
+  background: rgba(12, 12, 12, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.03), 0 0 12px rgba(255, 255, 255, 0.04);
+  height: calc((100% - 24px) / 3);
+  box-sizing: border-box;
+}
+
+.hud-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+  padding-bottom: 6px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+/* Fluorescent White Glow Utilities */
+.glow-white {
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 255, 255, 0.4);
+}
+
+.glow-white-sm {
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+}
+
+.glow-white-text {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 18px rgba(255, 255, 255, 0.6);
+}
+
+.glow-white-border {
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+}
+
+/* Animations */
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 22s linear infinite;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 10, 0.9);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* ─── HUD PANELS & BUTTONS (BLACK & FLUORESCENT WHITE) ─── */
+.hud-panel {
+  background: rgba(8, 8, 8, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.08), inset 0 0 25px rgba(255, 255, 255, 0.02);
+}
+
+.hud-panel-white {
+  background: rgba(12, 12, 12, 0.96);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.25);
+}
+
+.btn-hud-white {
+  background: #ffffff;
+  color: #000000;
+  font-weight: bold;
+  border-radius: 8px;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+}
+.btn-hud-white:hover {
+  background: #e4e4e7;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.85);
+}
+
+.btn-hud-gold {
+  background: #ffffff;
+  color: #000000;
+  font-weight: bold;
+  border-radius: 8px;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+}
+.btn-hud-gold:hover {
+  background: #e4e4e7;
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.85);
+}
+
+.font-hud {
+  font-family: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+}
+
+.font-mono-hud {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 18px rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+}
+
+/* Universal Black & Fluorescent White Overrides */
+[class*="text-cyan-100"], [class*="text-cyan-200"], [class*="text-cyan-300"] {
+  color: #ffffff !important;
+}
+[class*="text-cyan-400"] {
+  color: #f4f4f5 !important;
+}
+[class*="text-cyan-500"], [class*="text-cyan-600"] {
+  color: #a1a1aa !important;
+}
+[class*="border-cyan-400"], [class*="border-cyan-500"] {
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+[class*="border-cyan-500/20"], [class*="border-cyan-500/30"], [class*="border-cyan-500/40"] {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+[class*="bg-cyan-950"] {
+  background-color: #0c0c0c !important;
+}
+[class*="bg-cyan-400"] {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
+

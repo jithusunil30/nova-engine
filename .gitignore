@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+dist
+dist-ssr
+
+# Logs and Run Artifacts
+logs
+*.log
+nova_audit.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Sensitive Keys and Private State
+nova_memory.json
+.env
+.env.*
+!.env.example
+
+# Temporary and Generated Agent Scripts
+temp_*.py
+nova_script_*.js
+workspace_*.py
+test_nova.txt
+nova_context.db
+
+# Editor and OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db

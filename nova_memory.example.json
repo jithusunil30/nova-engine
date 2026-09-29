@@ -1,0 +1,64 @@
+{
+  "preferences": {
+    "userName": "Jithu",
+    "voiceName": "Nova (System Voice)",
+    "wakeWord": "nova",
+    "safetyLevel": "autonomous",
+    "theme": "pitch-black-fluorescent-white",
+    "geminiApiKey": "YOUR_GEMINI_API_KEY_HERE",
+    "geminiModel": "gemini-3.6-flash",
+    "aiProvider": "auto",
+    "groqApiKey": "YOUR_GROQ_API_KEY_HERE",
+    "groqModel": "llama-3.3-70b-versatile"
+  },
+  "userProfile": {
+    "name": "Jithu",
+    "title": "Lead Engineer & Architect",
+    "assistant": "N.O.V.A.",
+    "stack": [
+      "Antigravity IDE",
+      "Apache Cassandra 3.11",
+      "Python 3.13",
+      "Visual Studio Code",
+      "Google Chrome"
+    ]
+  },
+  "memories": [
+    {
+      "id": "mem-1",
+      "fact": "User callsign is Jithu.",
+      "category": "user_profile",
+      "timestamp": "2026-09-29T11:00:00.000Z",
+      "tags": ["identity", "user"]
+    },
+    {
+      "id": "mem-2",
+      "fact": "Antigravity IDE is Jithu's primary agent workspace.",
+      "category": "tools",
+      "timestamp": "2026-09-29T11:00:00.000Z",
+      "tags": ["antigravity", "ide"]
+    },
+    {
+      "id": "mem-3",
+      "fact": "Apache Cassandra 3.11 is installed with nodetool and cqlsh tools.",
+      "category": "database",
+      "timestamp": "2026-09-29T11:00:00.000Z",
+      "tags": ["cassandra", "database", "cql"]
+    },
+    {
+      "id": "mem-4",
+      "fact": "Python 3.13 is active for agent execution.",
+      "category": "programming",
+      "timestamp": "2026-09-29T11:00:00.000Z",
+      "tags": ["python", "scripts"]
+    },
+    {
+      "id": "mem-5",
+      "fact": "Visual Studio Code is installed and accessible via `code` CLI.",
+      "category": "tools",
+      "timestamp": "2026-09-29T11:00:00.000Z",
+      "tags": ["vscode", "editor"]
+    }
+  ],
+  "conversationHistory": []
+}
