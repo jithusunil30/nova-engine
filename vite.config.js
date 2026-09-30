@@ -10,6 +10,14 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    watch: {
+      ignored: [
+        '**/nova_memory.json',
+        '**/nova_audit.log',
+        '**/*.py',
+        '**/public/screenshots/**'
+      ]
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

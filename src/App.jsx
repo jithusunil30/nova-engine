@@ -191,11 +191,21 @@ export default function App() {
     ]);
 
     try {
-      const res = await fetch('/api/agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
+      let res;
+      try {
+        res = await fetch('/api/agent/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+      } catch (proxyErr) {
+        // Fallback directly to port 3001 if Vite proxy dropped or reloaded
+        res = await fetch('http://localhost:3001/api/agent/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt })
+        });
+      }
 
       if (res.status === 202) {
         const data = await res.json();
@@ -213,7 +223,7 @@ export default function App() {
       fetchMemory();
     } catch (err) {
       setAgentState('alert');
-      const errMsg = `Execution error: ${err.message}`;
+      const errMsg = `Execution error: ${err.message}. Ensure N.O.V.A. Backend Server (port 3001) is online.`;
       setResponseText(errMsg);
       speakText(errMsg);
     }
