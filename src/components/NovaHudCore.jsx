@@ -141,97 +141,199 @@ export default function NovaHudCore({
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  // Radar Core Scan Animation (Black and Radiant Fluorescent White)
+  // Live state ref so the 60fps Siri Canvas loop reacts immediately to speech/listening
+  const siriStateRef = useRef({ isSpeaking, isListening, agentState });
+  useEffect(() => {
+    siriStateRef.current = { isSpeaking, isListening, agentState };
+  }, [isSpeaking, isListening, agentState]);
+
+  // Siri Fluid Wave Circle Animation (Voice-Reactive Morphing Sphere & Fluid Ribbons)
   useEffect(() => {
     const canvas = radarCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let animId;
-    let angle = 0;
+    let time = 0;
+    let smoothEnergy = 0.15;
 
-    const renderRadar = () => {
+    const ribbons = [
+      { freq: 1.4, speed: 2.8, amp: 1.0, phase: 0.0, alpha: 0.85, width: 2.5 },
+      { freq: 2.1, speed: -3.4, amp: 0.78, phase: 1.3, alpha: 0.65, width: 2.0 },
+      { freq: 2.9, speed: 4.1, amp: 0.62, phase: 2.7, alpha: 0.50, width: 1.8 },
+      { freq: 1.8, speed: -2.2, amp: 0.88, phase: 4.1, alpha: 0.40, width: 1.5 },
+      { freq: 3.5, speed: 5.0, amp: 0.45, phase: 5.2, alpha: 0.32, width: 1.2 }
+    ];
+
+    const renderSiriOrb = () => {
+      const { isSpeaking: speaking, isListening: listening, agentState: aState } = siriStateRef.current;
+      const isExecuting = aState === 'executing';
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
 
-      angle += 0.025;
+      // Calculate target voice/activity energy
+      let targetEnergy = 0.14 + 0.04 * Math.sin(time * 1.6);
+      if (speaking) {
+        // Dynamic multi-harmonic voice syllable modulation while speaking
+        const syllablePulse =
+          Math.abs(Math.sin(time * 6.5)) * 0.45 +
+          Math.abs(Math.cos(time * 11.2)) * 0.35 +
+          Math.abs(Math.sin(time * 3.1)) * 0.2;
+        targetEnergy = 0.42 + syllablePulse * 0.65;
+      } else if (listening) {
+        targetEnergy = 0.45 + 0.25 * Math.abs(Math.sin(time * 4.5));
+      } else if (isExecuting) {
+        targetEnergy = 0.38 + 0.2 * Math.sin(time * 5.0);
+      }
 
-      // Concentric Radar Rings (Fluorescent White)
-      const rings = [55, 105, 155, 205];
-      rings.forEach((r, idx) => {
+      smoothEnergy += (targetEnergy - smoothEnergy) * 0.14;
+      time += 0.018 + smoothEnergy * 0.032;
+
+      const baseRadius = 148 + smoothEnergy * 18;
+
+      // 1. Ambient Outer Glow Halo
+      const outerHalo = ctx.createRadialGradient(cx, cy, baseRadius * 0.2, cx, cy, baseRadius * 1.42);
+      outerHalo.addColorStop(0, `rgba(255, 255, 255, ${0.12 + smoothEnergy * 0.22})`);
+      outerHalo.addColorStop(0.55, `rgba(255, 255, 255, ${0.05 + smoothEnergy * 0.12})`);
+      outerHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = outerHalo;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius * 1.42, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Morphing Liquid Siri Outer Contours (3 organic harmonic lobes)
+      for (let lobe = 0; lobe < 3; lobe++) {
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.strokeStyle = idx === rings.length - 1 ? 'rgba(255, 255, 255, 0.55)' : 'rgba(255, 255, 255, 0.22)';
-        ctx.lineWidth = 1.5;
+        const steps = 120;
+        const lobePhase = time * (lobe % 2 === 0 ? 1.2 : -1.4) + lobe * 2.1;
+        const deformAmp = (4 + smoothEnergy * 24) * (1 - lobe * 0.18);
+        const ringRadius = baseRadius + lobe * 7;
+
+        for (let i = 0; i <= steps; i++) {
+          const theta = (i / steps) * Math.PI * 2;
+          const rOffset =
+            Math.sin(theta * 3 + lobePhase) * deformAmp * 0.55 +
+            Math.cos(theta * 5 - lobePhase * 1.3) * deformAmp * 0.3 +
+            Math.sin(theta * 2 + time * 2) * deformAmp * 0.15;
+          const r = ringRadius + rOffset;
+          const x = cx + Math.cos(theta) * r;
+          const y = cy + Math.sin(theta) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(0.45 - lobe * 0.12) + smoothEnergy * 0.3})`;
+        ctx.lineWidth = lobe === 0 ? 2.2 : 1.2;
         ctx.shadowColor = '#ffffff';
-        ctx.shadowBlur = idx === rings.length - 1 ? 6 : 0;
-        if (idx === 2) ctx.setLineDash([4, 6]);
-        else ctx.setLineDash([]);
+        ctx.shadowBlur = 12 + smoothEnergy * 20;
         ctx.stroke();
+        ctx.restore();
+      }
+
+      // 3. Clipped Inner Siri Sphere & Multi-Ribbon Fluid Waves
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Deep glossy sphere background
+      const sphereBg = ctx.createRadialGradient(cx, cy - baseRadius * 0.3, 10, cx, cy, baseRadius);
+      sphereBg.addColorStop(0, 'rgba(30, 30, 35, 0.75)');
+      sphereBg.addColorStop(0.7, 'rgba(5, 5, 8, 0.92)');
+      sphereBg.addColorStop(1, 'rgba(0, 0, 0, 0.98)');
+      ctx.fillStyle = sphereBg;
+      ctx.fillRect(cx - baseRadius, cy - baseRadius, baseRadius * 2, baseRadius * 2);
+
+      // Additive light blending for overlapping Siri wave ribbons
+      ctx.globalCompositeOperation = 'lighter';
+
+      ribbons.forEach((ribbon, idx) => {
+        const maxWaveHeight = (16 + smoothEnergy * 95) * ribbon.amp;
+        const stepX = 3;
+        const startX = cx - baseRadius;
+        const endX = cx + baseRadius;
+
+        // Upper curve and mirrored lower curve forming a 3D Siri fluid ribbon
+        ctx.beginPath();
+        for (let x = startX; x <= endX; x += stepX) {
+          const normX = (x - cx) / baseRadius; // -1 to 1
+          // Bell-shaped envelope so waves taper smoothly at sphere edges
+          const envelope = Math.pow(Math.max(0, 1 - normX * normX), 1.6);
+          const wave1 = Math.sin(normX * Math.PI * ribbon.freq + time * ribbon.speed + ribbon.phase);
+          const wave2 = Math.cos(normX * Math.PI * (ribbon.freq * 1.7) - time * (ribbon.speed * 0.7));
+          const yOffset = (wave1 * 0.72 + wave2 * 0.28) * maxWaveHeight * envelope;
+          const y = cy + yOffset;
+          if (x === startX) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        for (let x = endX; x >= startX; x -= stepX) {
+          const normX = (x - cx) / baseRadius;
+          const envelope = Math.pow(Math.max(0, 1 - normX * normX), 1.6);
+          const wave1 = Math.sin(normX * Math.PI * ribbon.freq - time * (ribbon.speed * 0.85) + ribbon.phase + 0.9);
+          const yOffset = wave1 * maxWaveHeight * 0.55 * envelope;
+          const y = cy - yOffset;
+          ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+
+        const ribbonGrad = ctx.createLinearGradient(startX, cy - maxWaveHeight, endX, cy + maxWaveHeight);
+        ribbonGrad.addColorStop(0, 'rgba(255, 255, 255, 0.02)');
+        ribbonGrad.addColorStop(0.3, `rgba(220, 235, 255, ${ribbon.alpha * (0.28 + smoothEnergy * 0.42)})`);
+        ribbonGrad.addColorStop(0.5, `rgba(255, 255, 255, ${ribbon.alpha * (0.45 + smoothEnergy * 0.55)})`);
+        ribbonGrad.addColorStop(0.7, `rgba(210, 225, 255, ${ribbon.alpha * (0.28 + smoothEnergy * 0.42)})`);
+        ribbonGrad.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+
+        ctx.fillStyle = ribbonGrad;
+        ctx.shadowColor = '#ffffff';
+        ctx.shadowBlur = 15 + smoothEnergy * 25;
+        ctx.fill();
+
+        // Bright filament spine along primary wave
+        if (idx < 3) {
+          ctx.beginPath();
+          for (let x = startX; x <= endX; x += stepX) {
+            const normX = (x - cx) / baseRadius;
+            const envelope = Math.pow(Math.max(0, 1 - normX * normX), 1.6);
+            const wave1 = Math.sin(normX * Math.PI * ribbon.freq + time * ribbon.speed + ribbon.phase);
+            const wave2 = Math.cos(normX * Math.PI * (ribbon.freq * 1.7) - time * (ribbon.speed * 0.7));
+            const y = cy + (wave1 * 0.72 + wave2 * 0.28) * maxWaveHeight * envelope;
+            if (x === startX) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.45 + smoothEnergy * 0.55})`;
+          ctx.lineWidth = ribbon.width;
+          ctx.stroke();
+        }
       });
 
-      // Axis Crosshairs
+      // Central core hotspot glow when speaking
+      const coreGlow = ctx.createRadialGradient(cx, cy, 2, cx, cy, baseRadius * (0.35 + smoothEnergy * 0.45));
+      coreGlow.addColorStop(0, `rgba(255, 255, 255, ${0.25 + smoothEnergy * 0.65})`);
+      coreGlow.addColorStop(0.45, `rgba(255, 255, 255, ${0.08 + smoothEnergy * 0.25})`);
+      coreGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = coreGlow;
       ctx.beginPath();
-      ctx.moveTo(cx - 215, cy);
-      ctx.lineTo(cx + 215, cy);
-      ctx.moveTo(cx, cy - 215);
-      ctx.lineTo(cx, cy + 215);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
-      ctx.setLineDash([6, 6]);
-      ctx.stroke();
-
-      // Diagonal cross tick lines
-      ctx.beginPath();
-      ctx.moveTo(cx - 150, cy - 150);
-      ctx.lineTo(cx + 150, cy + 150);
-      ctx.moveTo(cx - 150, cy + 150);
-      ctx.lineTo(cx + 150, cy - 150);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.setLineDash([4, 8]);
-      ctx.stroke();
-
-      // Rotating Scan Beam (Radiant White Conic Gradient)
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(angle);
-
-      const grad = ctx.createConicGradient(0, 0, 0);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
-      grad.addColorStop(0.15, 'rgba(255, 255, 255, 0.08)');
-      grad.addColorStop(1, 'transparent');
-
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, 205, 0, Math.PI * 0.35);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Radiant Fluorescent White Tracking Blips on outer ring
-      ctx.beginPath();
-      ctx.arc(155, 0, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowBlur = 16;
-      ctx.shadowColor = '#ffffff';
+      ctx.arc(cx, cy, baseRadius * 0.85, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
 
-      // Second opposing blip
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(-angle * 0.7);
+      // 4. Crisp Glassmorphic Siri Sphere Rim & Specular Highlight
       ctx.beginPath();
-      ctx.arc(105, 0, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowBlur = 12;
+      ctx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.55 + smoothEnergy * 0.45})`;
+      ctx.lineWidth = 2;
       ctx.shadowColor = '#ffffff';
-      ctx.fill();
-      ctx.restore();
+      ctx.shadowBlur = 18 + smoothEnergy * 25;
+      ctx.stroke();
 
-      animId = requestAnimationFrame(renderRadar);
+      animId = requestAnimationFrame(renderSiriOrb);
     };
 
-    renderRadar();
+    renderSiriOrb();
     return () => cancelAnimationFrame(animId);
   }, []);
 
@@ -442,24 +544,38 @@ export default function NovaHudCore({
           {/* ═══ CENTER COLUMN: GIANT FLOATING RADAR CORE (Strict Dead Center) ═══ */}
           <div className="hud-col-center">
             
-            {/* Radar Canvas with Center Core Hub */}
-            <div className="relative w-[440px] h-[440px] flex items-center justify-center my-auto">
+            {/* Siri Fluid Wave Sphere (Voice-Reactive Central Circle) */}
+            <div 
+              onClick={() => {
+                if (isSpeaking) {
+                  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                  setIsSpeaking(false);
+                } else {
+                  toggleMic();
+                }
+              }}
+              className="relative w-[440px] h-[440px] flex items-center justify-center my-auto cursor-pointer group select-none"
+              title={isSpeaking ? "Click to Stop Speaking" : isListening ? "Listening... Click to Stop" : "Click to Speak to N.O.V.A."}
+            >
               <canvas 
                 ref={radarCanvasRef} 
                 width={450} 
                 height={450} 
-                className="absolute inset-0 m-auto pointer-events-none" 
+                className="absolute inset-0 m-auto pointer-events-none transition-transform duration-300 group-hover:scale-[1.03]" 
               />
 
-              {/* Central Core Box (Deep Black & Radiant White) */}
-              <div className="z-10 w-24 h-24 rounded-lg border-2 border-white bg-black/95 flex flex-col items-center justify-center text-center shadow-[0_0_35px_rgba(255,255,255,0.6)]">
-                <div className="grid grid-cols-3 gap-1 mb-1.5">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="w-1.5 h-1.5 bg-white rounded-sm shadow-[0_0_6px_#ffffff] animate-pulse" />
-                  ))}
-                </div>
-                <span className="font-bold text-[11px] text-white tracking-widest glow-white-text">CORE</span>
-                <span className="font-bold text-[10px] text-zinc-300 tracking-wider">ACTIVE</span>
+              {/* Subtle Floating Siri Status Pill at Bottom of Sphere */}
+              <div className="z-10 mt-64 px-4 py-1 rounded-full border border-white/40 bg-black/80 backdrop-blur-md flex items-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.35)] transition-all duration-300 group-hover:border-white">
+                <span className={`w-2 h-2 rounded-full bg-white shadow-[0_0_8px_#ffffff] ${isSpeaking || isListening || agentState === 'executing' ? 'animate-ping' : 'animate-pulse'}`} />
+                <span className="font-bold text-[10px] text-white tracking-[0.22em] glow-white-text">
+                  {isSpeaking
+                    ? 'N.O.V.A. SPEAKING'
+                    : isListening
+                    ? 'LISTENING...'
+                    : agentState === 'executing'
+                    ? 'SYNTHESIZING...'
+                    : 'N.O.V.A. CORE'}
+                </span>
               </div>
             </div>
 
